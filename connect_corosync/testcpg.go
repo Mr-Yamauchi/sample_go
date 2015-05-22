@@ -93,7 +93,7 @@ print_time(void)
 	printf("%s\n", buf);
 }
 
-void xxDeliverCallback(size_t msg_len, char *msg);
+void goDeliverCallback(uint32_t nodeid, uint32_t pid, size_t msg_len, char *msg);
 
 static void DeliverCallback (
 	cpg_handle_t handle,
@@ -103,15 +103,22 @@ static void DeliverCallback (
 	void *msg,
 	size_t msg_len)
 {
+#if 0
 	print_time();
 	printf("DeliverCallback: message (len=%lu)from %s: '%s'\n",
 		       (unsigned long int) msg_len, node_pid_format(nodeid, pid),
 		       (const char *)msg);
 
-	xxDeliverCallback(msg_len, (char *)msg);
+#endif
+	goDeliverCallback(nodeid, pid, msg_len, (char *)msg);
 }
 
-void xxConfchgCallback(
+static struct cpg_address *getMember(struct cpg_address *ptr, uint32_t idx);
+static struct cpg_address *getMember(struct cpg_address *ptr, uint32_t idx) {
+	return (ptr+idx);
+}
+
+void goConfchgCallback(
 	struct cpg_address *member_list, 
 	size_t member_list_entries,
 	struct cpg_address *left_list, 
@@ -129,13 +136,7 @@ static void ConfchgCallback (
 	unsigned int i;
 	int result;
 	uint32_t nodeid;
-
-	print_time();
-	printf("ConfchgCallback: group '");
-	print_cpgname(groupName);
-	printf("'\n");
-	print_localnodeid(handle);
-
+#if 0
 	for (i=0; i<joined_list_entries; i++) {
 		printf("joined %s reason: %d\n",
 				node_pid_format(joined_list[i].nodeid, joined_list[i].pid),
@@ -154,7 +155,7 @@ static void ConfchgCallback (
 		printf("%s\n",
 				node_pid_format(member_list[i].nodeid, member_list[i].pid));
 	}
-
+#endif
 	result = cpg_local_get(handle, &nodeid);
 	if(result != CS_OK) {
 		printf("failed to get local nodeid %d\n", result);
@@ -177,11 +178,21 @@ static void ConfchgCallback (
 			}
 		}
 	}
-	xxConfchgCallback(
+	goConfchgCallback(
 		(struct cpg_address *)member_list, member_list_entries,
 		(struct cpg_address *)left_list, left_list_entries,
 		(struct cpg_address *)joined_list, joined_list_entries);
 }
+
+static uint32_t *getMember2(uint32_t *ptr, uint32_t idx);
+static uint32_t *getMember2(uint32_t *ptr, uint32_t idx) {
+	return (ptr+idx);
+}
+
+void goTotemchgCallback(
+        struct cpg_ring_id ring_id,
+        uint32_t member_list_entries,
+        uint32_t *member_list);
 
 static void TotemConfchgCallback (
 	cpg_handle_t handle,
@@ -189,6 +200,7 @@ static void TotemConfchgCallback (
         uint32_t member_list_entries,
         const uint32_t *member_list)
 {
+#if 0
 	unsigned int i;
 
 	printf("\n");
@@ -202,6 +214,9 @@ static void TotemConfchgCallback (
 		printf("%d ", member_list[i]);
 	}
 	printf ("\n");
+#endif
+	goTotemchgCallback(ring_id, member_list_entries, (uint32_t *)member_list);
+	
 }
 
 static cpg_model_v1_data_t model_data = {
@@ -387,32 +402,59 @@ int runs () {
 	printf ("Finalize  result is %d (should be 1)\n", result);
 	return (0);
 }
-
 */
 import "C"
 import "runtime"
 import "fmt"
 
-//export xxConfchgCallback 
-func xxConfchgCallback(member_list *C.struct_cpg_address, member_list_entries C.size_t,
+//export goConfchgCallback 
+func goConfchgCallback(member_list *C.struct_cpg_address, member_list_entries C.size_t,
         left_list *C.struct_cpg_address, left_list_entries C.size_t,
         join_list *C.struct_cpg_address, joined_list_entries C.size_t) {
 
 	fmt.Println("------------golang:ConfChg------------")
 	fmt.Println("--member_ent :", member_list_entries)
+	for i:= 0; i<int(member_list_entries);i++ {
+		p := (*C.struct_cpg_address)(C.getMember(member_list, C.uint32_t(i)))
+		fmt.Printf("-- member(%d:%d)\n", p.nodeid, p.pid)
+	}
 	fmt.Println("--left_ent :", left_list_entries)
+	for j:= 0; j<int(left_list_entries);j++ {
+		p := (*C.struct_cpg_address)(C.getMember(left_list, C.uint32_t(j)))
+		fmt.Printf("-- left  (%d:%d)\n", p.nodeid, p.pid)
+	}
 	fmt.Println("--join_ent :", joined_list_entries)
+	for k:= 0; k<int(joined_list_entries);k++ {
+		p := (*C.struct_cpg_address)(C.getMember(join_list, C.uint32_t(k)))
+		fmt.Printf("-- joined(%d:%d)\n", p.nodeid, p.pid)
+	}
 }
 
-//export xxDeliverCallback
-func xxDeliverCallback(msg_len C.size_t, msg *C.char) {
-	fmt.Println("------------golang:Deliver------------", msg_len, C.GoString(msg))
+//export goDeliverCallback
+func goDeliverCallback(nodeid C.uint32_t, pid C.uint32_t, msg_len C.size_t, msg *C.char) {
+	fmt.Println("------------golang:Deliver------------")
+	fmt.Printf("DeliverCallback: message (len=%d)from %s: %d:%d\n",
+		       msg_len, C.GoString(msg), nodeid, pid)
 }
+//export goTotemchgCallback
+func goTotemchgCallback(ring_id C.struct_cpg_ring_id,
+        member_list_entries C.uint32_t,
+        member_list *C.uint32_t){
 
+	fmt.Println("------------golang:TotemchgCallback------------")
+	fmt.Printf("goTotemConfchgCallback: ringid (%d.%d)\n", ring_id.nodeid, ring_id.seq)
+	fmt.Printf("active processors %d: \n", member_list_entries)
+
+	for i:=0; i<int(member_list_entries); i++ {
+		p := (*C.uint32_t)(C.getMember2(member_list, C.uint32_t(i)))
+		fmt.Printf(" %d \n", *p)
+	}
+}
+//
 func init() {
 	runtime.LockOSThread()
 }
-
+//
 func main() {
 	ech := make(chan int)
 	go func() {
