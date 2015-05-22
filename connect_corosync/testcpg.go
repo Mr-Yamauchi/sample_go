@@ -406,6 +406,7 @@ int runs () {
 import "C"
 import "runtime"
 import "fmt"
+import "strings"
 
 //export goConfchgCallback 
 func goConfchgCallback(member_list *C.struct_cpg_address, member_list_entries C.size_t,
@@ -434,7 +435,7 @@ func goConfchgCallback(member_list *C.struct_cpg_address, member_list_entries C.
 func goDeliverCallback(nodeid C.uint32_t, pid C.uint32_t, msg_len C.size_t, msg *C.char) {
 	fmt.Println("------------golang:Deliver------------")
 	fmt.Printf("DeliverCallback: message (len=%d)from %s: %d:%d\n",
-		       msg_len, C.GoString(msg), nodeid, pid)
+		       msg_len, strings.Trim(C.GoString(msg), "\n"), nodeid, pid)
 }
 //export goTotemchgCallback
 func goTotemchgCallback(ring_id C.struct_cpg_ring_id,
